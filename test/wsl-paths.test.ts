@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { join } from "node:path";
 import { describe, test } from "node:test";
+import { type KeybindingsConfig, KeybindingsManager } from "@earendil-works/pi-tui";
 import {
 	convertDroppedPaths,
 	InlineLoader,
@@ -8,7 +9,6 @@ import {
 	isExpiredSnip,
 	isPasteImageKey,
 	nextSnipPath,
-	pasteImageKeys,
 	rewritePaste,
 	snipFileName,
 } from "../extensions/wsl-paths.ts";
@@ -56,19 +56,19 @@ describe("snip files", () => {
 });
 
 describe("image paste trigger", () => {
-	test("default key is alt+v", () => assert.deepEqual(pasteImageKeys(undefined), ["alt+v"]));
-	test("default when the action is not remapped", () =>
-		assert.deepEqual(pasteImageKeys({ "app.session.new": "ctrl+n" }), ["alt+v"]));
-	test("remapped to one key", () =>
-		assert.deepEqual(pasteImageKeys({ "app.clipboard.pasteImage": "ctrl+alt+v" }), ["ctrl+alt+v"]));
-	test("remapped to several keys", () =>
-		assert.deepEqual(pasteImageKeys({ "app.clipboard.pasteImage": ["alt+v", "ctrl+shift+v"] }), ["alt+v", "ctrl+shift+v"]));
-	test("unbinding disables the key", () => assert.deepEqual(pasteImageKeys({ "app.clipboard.pasteImage": [] }), []));
+	// pi defines app.clipboard.pasteImage as alt+v on WSL and passes the user's keybindings.json on top.
+	const keys = (user?: KeybindingsConfig) =>
+		new KeybindingsManager({ "app.clipboard.pasteImage": { defaultKeys: "alt+v" } }, user);
 
-	test("ESC v is alt+v", () => assert.equal(isPasteImageKey("\x1bv", ["alt+v"]), true));
-	test("plain v is not", () => assert.equal(isPasteImageKey("v", ["alt+v"]), false));
-	test("a paste is not a key", () => assert.equal(isPasteImageKey("\x1b[200~v\x1b[201~", ["alt+v"]), false));
-	test("no bound keys never match", () => assert.equal(isPasteImageKey("\x1bv", []), false));
+	test("ESC v is alt+v", () => assert.equal(isPasteImageKey("\x1bv", keys()), true));
+	test("plain v is not", () => assert.equal(isPasteImageKey("v", keys()), false));
+	test("a paste is not a key", () => assert.equal(isPasteImageKey("\x1b[200~v\x1b[201~", keys()), false));
+	test("rebinding replaces alt+v", () =>
+		assert.equal(isPasteImageKey("\x1bv", keys({ "app.clipboard.pasteImage": "ctrl+alt+v" })), false));
+	test("the rebound key matches", () =>
+		assert.equal(isPasteImageKey("\x1b\x16", keys({ "app.clipboard.pasteImage": "ctrl+alt+v" })), true));
+	test("unbinding disables the key", () =>
+		assert.equal(isPasteImageKey("\x1bv", keys({ "app.clipboard.pasteImage": [] })), false));
 
 	// Windows Terminal sends an empty paste for Ctrl+V when the clipboard holds only an image.
 	test("empty paste is detected", () => assert.equal(isEmptyPaste("\x1b[200~\x1b[201~"), true));

@@ -1,6 +1,6 @@
 {
   "name": "pi-wsl-paste",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "description": "Paste Windows snips and drop Windows files into pi running on WSL. Bundles pi-paster for image attachments.",
   "type": "module",

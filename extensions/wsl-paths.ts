@@ -14,13 +14,13 @@
  *    Snips older than 7 days are deleted when pi starts.
  */
 import { execFile } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync } from "node:fs";
 import { mkdir, readdir, stat, unlink } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
-import { type ExtensionAPI, type ExtensionContext, getAgentDir } from "@earendil-works/pi-coding-agent";
-import { isKeyRelease, type KeyId, Loader, matchesKey } from "@earendil-works/pi-tui";
+import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import { getKeybindings, isKeyRelease, type KeybindingsManager, Loader } from "@earendil-works/pi-tui";
 
 const PASTE_START = "\x1b[200~";
 const PASTE_END = "\x1b[201~";
@@ -88,16 +88,9 @@ export function isExpiredSnip(name: string, mtimeMs: number, nowMs: number): boo
 	return /^snip-.*\.png$/.test(name) && nowMs - mtimeMs > SNIP_MAX_AGE_MS;
 }
 
-/** Keys bound to pi's app.clipboard.pasteImage action, given the parsed keybindings.json. */
-export function pasteImageKeys(config: unknown): KeyId[] {
-	const bound = (config as Record<string, unknown> | undefined)?.["app.clipboard.pasteImage"];
-	if (typeof bound === "string") return [bound as KeyId];
-	if (Array.isArray(bound)) return bound.filter((key): key is KeyId => typeof key === "string");
-	return ["alt+v"];
-}
-
-export function isPasteImageKey(data: string, keys: KeyId[]): boolean {
-	return !isKeyRelease(data) && keys.some((key) => matchesKey(data, key));
+/** Whether the input is pi's app.clipboard.pasteImage key (Alt+V on WSL unless rebound). */
+export function isPasteImageKey(data: string, keybindings: KeybindingsManager = getKeybindings()): boolean {
+	return !isKeyRelease(data) && keybindings.matches(data, "app.clipboard.pasteImage");
 }
 
 export function isEmptyPaste(data: string): boolean {
@@ -112,14 +105,6 @@ export class InlineLoader extends Loader {
 
 	dispose(): void {
 		this.stop();
-	}
-}
-
-function readKeybindingsConfig(): unknown {
-	try {
-		return JSON.parse(readFileSync(join(getAgentDir(), "keybindings.json"), "utf8"));
-	} catch {
-		return undefined;
 	}
 }
 
@@ -175,9 +160,8 @@ export default function (pi: ExtensionAPI) {
 		if (ctx.mode !== "tui") return;
 		unsubscribe?.();
 
-		const imageKeys = IS_WSL ? pasteImageKeys(readKeybindingsConfig()) : [];
 		unsubscribe = ctx.ui.onTerminalInput((data) => {
-			if (isPasteImageKey(data, imageKeys) || (IS_WSL && isEmptyPaste(data))) {
+			if (IS_WSL && (isPasteImageKey(data) || isEmptyPaste(data))) {
 				if (!reading) void pasteClipboardImage(ctx);
 				return { consume: true };
 			}

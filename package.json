@@ -1,0 +1,33 @@
+{
+  "name": "pi-wsl-paste",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Paste Windows snips and drop Windows files into pi running on WSL. Bundles pi-paster for image attachments.",
+  "type": "module",
+  "keywords": [
+    "pi-package",
+    "wsl",
+    "windows-terminal",
+    "clipboard"
+  ],
+  "scripts": {
+    "test": "node --test test/*.test.ts"
+  },
+  "dependencies": {
+    "pi-paster": "0.2.3"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*",
+    "@earendil-works/pi-tui": "*"
+  },
+  "devDependencies": {
+    "@earendil-works/pi-coding-agent": "0.87.1",
+    "@earendil-works/pi-tui": "0.87.1"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions/wsl-paths.ts",
+      "node_modules/pi-paster/src/index.ts"
+    ]
+  }
+}
